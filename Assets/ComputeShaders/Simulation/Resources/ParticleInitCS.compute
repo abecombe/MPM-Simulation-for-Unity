@@ -1,0 +1,24 @@
+﻿#pragma kernel InitParticle
+
+#include "../Common.hlsl"
+
+float3 _ParticleInitRangeMin;
+float3 _ParticleInitRangeMax;
+
+RWStructuredBuffer<Particle> _ParticleBufferWrite;
+
+[numthreads(128, 1, 1)]
+void InitParticle(uint3 thread_id : SV_DispatchThreadID)
+{
+    RETURN_IF_INVALID(thread_id);
+
+    const uint p_id = thread_id.x;
+
+    Particle p = (Particle)0;
+
+    p.position = PCG3_Range(p_id, _ParticleInitRangeMin, _ParticleInitRangeMax);
+
+    ClampPosition(p.position, _GridMin, _GridMax);
+
+    _ParticleBufferWrite[p_id] = p;
+}

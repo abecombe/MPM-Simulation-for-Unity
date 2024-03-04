@@ -3,7 +3,7 @@
 
 float3 _GridMin;
 float3 _GridMax;
-int3   _GridSize;
+int3 _GridSize;
 float _GridSpacing;
 float _GridInvSpacing;
 

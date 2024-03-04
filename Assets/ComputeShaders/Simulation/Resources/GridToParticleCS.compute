@@ -1,16 +1,11 @@
 ﻿#pragma kernel GridToParticle
 
-#pragma multi_compile _ USE_LINEAR_KERNEL USE_QUADRATIC_KERNEL
-
 #include "../Common.hlsl"
-#include "../GridParamsSampling.hlsl"
-
-float _Flipness;
+#include "../APICParamsSampling.hlsl"
 
 RWStructuredBuffer<Particle> _ParticleBufferRW;
 
 StructuredBuffer<float3> _GridVelocityBufferRead;
-StructuredBuffer<float3> _GridOriginalVelocityBufferRead;
 
 [numthreads(128, 1, 1)]
 void GridToParticle(uint3 thread_id : SV_DispatchThreadID)
@@ -21,13 +16,11 @@ void GridToParticle(uint3 thread_id : SV_DispatchThreadID)
 
     Particle p = _ParticleBufferRW[p_id];
 
-    const float3 g_origin_vel = SampleGridParam(p.position, _GridOriginalVelocityBufferRead);
-    const float3 g_vel = SampleGridParam(p.position, _GridVelocityBufferRead);
+    SampleAPICParams(p, _GridVelocityBufferRead);
 
-    const float3 p_pic_vel = g_vel;
-    const float3 p_flip_vel = p.velocity + (g_vel - g_origin_vel);
+    p.position += p.velocity * _DeltaTime;
 
-    p.velocity = lerp(p_pic_vel, p_flip_vel, _Flipness);
+    ClampPosition(p.position, _GridMin, _GridMax);
 
     _ParticleBufferRW[p_id] = p;
 }

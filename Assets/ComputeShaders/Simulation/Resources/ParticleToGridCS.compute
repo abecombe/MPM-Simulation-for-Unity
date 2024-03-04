@@ -50,7 +50,7 @@ void ParticleToGrid1(uint3 thread_id : SV_DispatchThreadID)
 
         sum_mass += mass_contrib;
         sum_momentum += mass_contrib * p.velocity;
-        sum_momentum += mass_contrib * mul(p.C, c_position - p.position);
+        sum_momentum += mass_contrib * (float3)mul(p.C, (float3x1)(c_position - p.position));
     }
     FOR_EACH_NEIGHBOR_CELL_PARTICLE_END
 
@@ -99,7 +99,7 @@ void ParticleToGrid3(uint3 thread_id : SV_DispatchThreadID)
 
         const float weight = GetWeight(p.position, c_position, _GridInvSpacing);
 
-        sum_momentum += _DeltaTime * weight * mul(_ParticleStressForceBufferRead[p_id], c_position - p.position);
+        sum_momentum += _DeltaTime * weight * (float3)mul(_ParticleStressForceBufferRead[p_id], (float3x1)(c_position - p.position));
     }
     FOR_EACH_NEIGHBOR_CELL_PARTICLE_END
 

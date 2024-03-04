@@ -13,7 +13,6 @@ float _DeltaTime;
 #include "../GridHelper.hlsl"
 
 #include "MPMParticle.hlsl"
-#include "FreeSurface.hlsl"
 #include "BoundaryCondition.hlsl"
 #include "KernelFunc.hlsl"
 

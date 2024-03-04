@@ -580,7 +580,7 @@ GameObject:
   - component: {fileID: 1099405000}
   - component: {fileID: 1099404999}
   m_Layer: 0
-  m_Name: FLIPSimulation
+  m_Name: MPMSimulation
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -612,7 +612,6 @@ MonoBehaviour:
   _viscosity: 0
   _mouseForce: 1.32
   _mouseForceRange: 2.25
-  _kernelFunction: 0
   _advectionMethod: 0
   _activeDensityProjection: 1
   _diffusionJacobiIteration: 15

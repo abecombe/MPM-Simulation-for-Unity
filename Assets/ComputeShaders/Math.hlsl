@@ -9,7 +9,7 @@ float2x2 inverse(float2x2 m)
     return
         1.0f / determinant(m) *
             float2x2(
-                 m[0][0], -m[0][1],
+                 m[1][1], -m[0][1],
                 -m[1][0],  m[0][0]
             );
 }

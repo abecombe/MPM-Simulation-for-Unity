@@ -3,7 +3,7 @@
 #pragma kernel SetGridObjectID
 #pragma kernel RearrangeObject
 
-#include "../../Simulation/FLIPParticle.hlsl"
+#include "../../Simulation/MPMParticle.hlsl"
 
 #define Object Particle
 #define Pos position

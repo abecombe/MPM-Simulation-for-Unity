@@ -7,11 +7,12 @@ float _DeltaTime;
 
 #include "../Constant.hlsl"
 #include "../PCG.hlsl"
+#include "../Math.hlsl"
 
 #include "../GridData.hlsl"
 #include "../GridHelper.hlsl"
 
-#include "FLIPParticle.hlsl"
+#include "MPMParticle.hlsl"
 #include "FreeSurface.hlsl"
 #include "BoundaryCondition.hlsl"
 #include "KernelFunc.hlsl"

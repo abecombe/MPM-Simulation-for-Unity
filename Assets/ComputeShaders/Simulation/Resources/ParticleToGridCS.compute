@@ -1,65 +1,109 @@
-﻿#pragma kernel ParticleToGrid
+﻿#pragma kernel ParticleToGrid1
+#pragma kernel ParticleToGrid2
+#pragma kernel ParticleToGrid3
 
-#pragma multi_compile _ USE_LINEAR_KERNEL USE_QUADRATIC_KERNEL
+#define USE_QUADRATIC_KERNEL
 
 #include "../Common.hlsl"
+#include "../GridParamsSampling.hlsl"
 
-StructuredBuffer<Particle> _ParticleBufferRead;
+float _EosStiffness;
+float _EosPower;
+float _RestDensity;
+
+float _DynamicViscosity;
 
 StructuredBuffer<uint2> _GridParticleIDBufferRead;
 
-RWStructuredBuffer<uint> _GridTypeBufferWrite;
+StructuredBuffer<Particle> _ParticleBufferRead;
+RWStructuredBuffer<Particle> _ParticleBufferRW;
+
+StructuredBuffer<float3x3> _ParticleStressForceBufferRead;
+RWStructuredBuffer<float3x3> _ParticleStressForceBufferWrite;
 
 RWStructuredBuffer<float3> _GridVelocityBufferWrite;
-RWStructuredBuffer<float3> _GridOriginalVelocityBufferWrite;
+RWStructuredBuffer<float3> _GridVelocityBufferRW;
 
-#if defined(USE_LINEAR_KERNEL)
+StructuredBuffer<float> _GridMassBufferRead;
+RWStructuredBuffer<float> _GridMassBufferWrite;
+
 static const int grid_range[6] = { -1, 1, -1, 1, -1, 1 };
-#elif defined(USE_QUADRATIC_KERNEL)
-static const int grid_range[6] = { -2, 1, -2, 1, -2, 1 };
-#else
-static const int grid_range[6] = { 0, 0, 0, 0, 0, 0 };
-#endif
 
 [numthreads(128, 1, 1)]
-void ParticleToGrid(uint3 thread_id : SV_DispatchThreadID)
+void ParticleToGrid1(uint3 thread_id : SV_DispatchThreadID)
 {
     RETURN_IF_INVALID(thread_id);
 
     const uint c_id = thread_id.x;
     const int3 c_index = CellIDToCellIndex(c_id);
 
-    // decide grid type
-    const uint2 particle_index = _GridParticleIDBufferRead[c_id];
-    _GridTypeBufferWrite[c_id] = particle_index.y - particle_index.x > 0 ? GT_FLUID : GT_AIR;
+    const float3 c_position = CellIndexToWorldPos(c_index);
 
-    const float3 position = CellIndexToWorldPos(c_index);
-    const float3 position_vx = position + float3(-0.5f * _GridSpacing.x, 0.0f, 0.0f);
-    const float3 position_vy = position + float3(0.0f, -0.5f * _GridSpacing.y, 0.0f);
-    const float3 position_vz = position + float3(0.0f, 0.0f, -0.5f * _GridSpacing.z);
+    float sum_mass = 0;
+    float3 sum_momentum = 0;
 
-    float3 sum_weight = 0;
-    float3 sum_velocity = 0;
-
-    // calc weight & velocity
     FOR_EACH_NEIGHBOR_CELL_PARTICLE_START(c_index, p_id, _GridParticleIDBufferRead, grid_range)
     {
         const Particle p = _ParticleBufferRead[p_id];
 
-        float3 weight;
-        weight.x = GetWeight(p.position, position_vx, _GridInvSpacing);
-        weight.y = GetWeight(p.position, position_vy, _GridInvSpacing);
-        weight.z = GetWeight(p.position, position_vz, _GridInvSpacing);
+        const float mass_contrib = GetWeight(p.position, c_position, _GridInvSpacing) * p.mass;
 
-        sum_weight += weight;
-        sum_velocity += weight * p.velocity;
+        sum_mass += mass_contrib;
+        sum_momentum += mass_contrib * p.velocity;
+        sum_momentum += mass_contrib * mul(p.C, c_position - p.position);
     }
     FOR_EACH_NEIGHBOR_CELL_PARTICLE_END
 
-    float3 velocity = sum_weight > 0 ? sum_velocity / max(sum_weight, FLT_MIN) : 0.0f;
+    _GridVelocityBufferWrite[c_id] = sum_momentum;
+    _GridMassBufferWrite[c_id] = sum_mass;
+}
 
-    EnforceBoundaryCondition(velocity, c_index);
+[numthreads(128, 1, 1)]
+void ParticleToGrid2(uint3 thread_id : SV_DispatchThreadID)
+{
+    RETURN_IF_INVALID(thread_id);
 
-    _GridVelocityBufferWrite[c_id] = velocity;
-    _GridOriginalVelocityBufferWrite[c_id] = velocity;
+    const uint p_id = thread_id.x;
+
+    const Particle p = _ParticleBufferRead[p_id];
+
+    const float density = SampleGridParam(p.position, _GridMassBufferRead) * _GridInvSpacing * _GridInvSpacing * _GridInvSpacing;
+    const float volume = p.mass / density;
+
+    const float pressure = _EosStiffness * max(pow(max(density / _RestDensity, 0), _EosPower) - 1.0f, 0);
+
+    const float3x3 dvdx = p.C;
+    const float3x3 stress = -pressure * Identity3x3 + _DynamicViscosity * (dvdx + transpose(dvdx));
+
+    const float3x3 f = -volume * (4.0f * _GridInvSpacing * _GridInvSpacing) * stress;
+
+    _ParticleStressForceBufferWrite[p_id] = f;
+}
+
+[numthreads(128, 1, 1)]
+void ParticleToGrid3(uint3 thread_id : SV_DispatchThreadID)
+{
+    RETURN_IF_INVALID(thread_id);
+
+    const uint c_id = thread_id.x;
+    const int3 c_index = CellIDToCellIndex(c_id);
+
+    const float3 c_position = CellIndexToWorldPos(c_index);
+
+    const float sum_mass = _GridMassBufferRead[c_id];
+    float3 sum_momentum = _GridVelocityBufferRW[c_id];
+
+    FOR_EACH_NEIGHBOR_CELL_PARTICLE_START(c_index, p_id, _GridParticleIDBufferRead, grid_range)
+    {
+        const Particle p = _ParticleBufferRead[p_id];
+
+        const float weight = GetWeight(p.position, c_position, _GridInvSpacing);
+
+        sum_momentum += _DeltaTime * weight * mul(_ParticleStressForceBufferRead[p_id], c_position - p.position);
+    }
+    FOR_EACH_NEIGHBOR_CELL_PARTICLE_END
+
+    const float3 velocity = sum_mass > 0 ? sum_momentum / max(sum_mass, FLT_MIN) : 0.0f;
+
+    _GridVelocityBufferRW[c_id] = velocity;
 }

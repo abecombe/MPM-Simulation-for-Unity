@@ -6,19 +6,15 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.VFX;
 
-public class FLIPSimulation : MonoBehaviour, IDisposable
+public class MPMSimulation : MonoBehaviour, IDisposable
 {
     #region Structs & Enums
     private struct Particle
     {
         public float3 Position;
         public float3 Velocity;
-    }
-
-    private enum KernelFunction
-    {
-        Linear,
-        Quadratic
+        public float3x3 C; // affine momentum matrix
+        public float Mass;
     }
 
     private enum AdvectionMethod
@@ -102,7 +98,6 @@ public class FLIPSimulation : MonoBehaviour, IDisposable
     [SerializeField] [Range(0f, 10f)] private float _viscosity = 0f;
     [SerializeField] [Range(0f, 5f)] private float _mouseForce = 1.32f;
     [SerializeField] [Range(0f, 5f)] private float _mouseForceRange = 2.25f;
-    [SerializeField] private KernelFunction _kernelFunction = KernelFunction.Linear;
     [SerializeField] private AdvectionMethod _advectionMethod = AdvectionMethod.ForwardEuler;
     [SerializeField] private bool _activeDensityProjection = true;
     [SerializeField] [Range(1, 30)] private uint _diffusionJacobiIteration = 15;
@@ -194,17 +189,7 @@ public class FLIPSimulation : MonoBehaviour, IDisposable
         cs.SetVector("_GridSpacing", GridSpacing);
         cs.SetVector("_GridInvSpacing", GridInvSpacing);
 
-        switch (_kernelFunction)
-        {
-            case KernelFunction.Linear:
-                cs.EnableKeyword("USE_LINEAR_KERNEL");
-                cs.DisableKeyword("USE_QUADRATIC_KERNEL");
-                break;
-            case KernelFunction.Quadratic:
-                cs.DisableKeyword("USE_LINEAR_KERNEL");
-                cs.EnableKeyword("USE_QUADRATIC_KERNEL");
-                break;
-        }
+        cs.EnableKeyword("USE_LINEAR_KERNEL");
     }
 
     // transferring velocity from particle to grid
@@ -504,7 +489,6 @@ public class FLIPSimulation : MonoBehaviour, IDisposable
                 UI.Space().SetHeight(10f),
                 UI.Label("Numerical Method"),
                 UI.Indent(
-                    UI.Field("Kernel Function", () => _kernelFunction),
                     UI.Field("Advection Method", () => _advectionMethod),
                     UI.Field("Density Projection", () => _activeDensityProjection)
                 ),

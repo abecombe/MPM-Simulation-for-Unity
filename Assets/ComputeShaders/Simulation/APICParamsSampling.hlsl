@@ -11,20 +11,17 @@
 #define S1(S) (0.75f - S * S)
 #define S2(S) (0.5f * (0.5f + S) * (0.5f + S))
 
+#define GET_VALUE_OF_EACH_CELL(SUM, G_POS, C_INDEX, S, WEIGHT, GRID_VELOCITY_BUFFER) {\
+const uint c_id = CellIndexToCellID(C_INDEX);\
+const float1x4 c_pvec = (float1x4)(CellIndexToWorldPos(C_INDEX) - G_POS, 1.0f);\
+SUM += mul((float3x1)GRID_VELOCITY_BUFFER[c_id], c_pvec) * WEIGHT;\
+}\
+
 #define INTERPOLATE_X(SUM, G_POS, C_INDEX, S, WEIGHT, GRID_VELOCITY_BUFFER) {\
-const int3 c_index_0 = C_INDEX + int3(-1, 0, 0);\
-const int3 c_index_1 = C_INDEX + int3(0, 0, 0);\
-const int3 c_index_2 = C_INDEX + int3(1, 0, 0);\
-const uint c_id_0 = CellIndexToCellID(c_index_0);\
-const uint c_id_1 = CellIndexToCellID(c_index_1);\
-const uint c_id_2 = CellIndexToCellID(c_index_2);\
-const float1x4 c_pvec_0 = (float1x4)(CellIndexToWorldPos(c_index_0) - G_POS, 1.0f);\
-const float1x4 c_pvec_1 = (float1x4)(CellIndexToWorldPos(c_index_1) - G_POS, 1.0f);\
-const float1x4 c_pvec_2 = (float1x4)(CellIndexToWorldPos(c_index_2) - G_POS, 1.0f);\
 float3x4 sum_x = 0;\
-sum_x += mul((float3x1)GRID_VELOCITY_BUFFER[c_id_0], c_pvec_0) * S0(S.x);\
-sum_x += mul((float3x1)GRID_VELOCITY_BUFFER[c_id_1], c_pvec_1) * S1(S.x);\
-sum_x += mul((float3x1)GRID_VELOCITY_BUFFER[c_id_2], c_pvec_2) * S2(S.x);\
+GET_VALUE_OF_EACH_CELL(sum_x, G_POS, C_INDEX + int3(-1, 0, 0), S, S0(S.x), GRID_VELOCITY_BUFFER)\
+GET_VALUE_OF_EACH_CELL(sum_x, G_POS, C_INDEX + int3(0, 0, 0), S, S1(S.x), GRID_VELOCITY_BUFFER)\
+GET_VALUE_OF_EACH_CELL(sum_x, G_POS, C_INDEX + int3(1, 0, 0), S, S2(S.x), GRID_VELOCITY_BUFFER)\
 sum_x *= WEIGHT;\
 SUM += sum_x;\
 }\

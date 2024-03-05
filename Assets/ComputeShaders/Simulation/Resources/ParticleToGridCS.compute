@@ -9,7 +9,7 @@
 
 float _EosStiffness;
 float _EosPower;
-float _RestDensity;
+float _InvRestDensity;
 
 float _DynamicViscosity;
 
@@ -70,7 +70,7 @@ void ParticleToGrid2(uint3 thread_id : SV_DispatchThreadID)
     const float density = SampleGridParam(p.position, _GridMassBufferRead) * _GridInvSpacing * _GridInvSpacing * _GridInvSpacing;
     const float volume = p.mass / density;
 
-    const float pressure = _EosStiffness * max(pow(max(density / _RestDensity, 0), _EosPower) - 1.0f, 0);
+    const float pressure = _EosStiffness * max(pow(max(density * _InvRestDensity, 0), _EosPower) - 1.0f, 0);
 
     const float3x3 dvdx = p.C;
     const float3x3 stress = -pressure * Identity3x3 + _DynamicViscosity * (dvdx + transpose(dvdx));

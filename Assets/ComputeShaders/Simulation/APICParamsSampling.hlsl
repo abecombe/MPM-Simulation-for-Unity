@@ -21,9 +21,12 @@ const uint c_id_2 = CellIndexToCellID(c_index_2);\
 const float1x4 c_pvec_0 = (float1x4)((c_index_0 - P_INDEX - S) * _GridSpacing, 1.0f);\
 const float1x4 c_pvec_1 = (float1x4)((c_index_1 - P_INDEX - S) * _GridSpacing, 1.0f);\
 const float1x4 c_pvec_2 = (float1x4)((c_index_2 - P_INDEX - S) * _GridSpacing, 1.0f);\
-SUM += mul((float3x1)GRID_VELOCITY_BUFFER[c_id_0], c_pvec_0) * S0(S.x);\
-SUM += mul((float3x1)GRID_VELOCITY_BUFFER[c_id_1], c_pvec_1) * S1(S.x);\
-SUM += mul((float3x1)GRID_VELOCITY_BUFFER[c_id_2], c_pvec_2) * S2(S.x);\
+float3x4 sum_x = 0;\
+sum_x += mul((float3x1)GRID_VELOCITY_BUFFER[c_id_0], c_pvec_0) * S0(S.x);\
+sum_x += mul((float3x1)GRID_VELOCITY_BUFFER[c_id_1], c_pvec_1) * S1(S.x);\
+sum_x += mul((float3x1)GRID_VELOCITY_BUFFER[c_id_2], c_pvec_2) * S2(S.x);\
+sum_x *= WEIGHT;\
+SUM += sum_x;\
 }\
 
 #define INTERPOLATE_Y(SUM, C_INDEX, P_INDEX, S, WEIGHT, GRID_VELOCITY_BUFFER) {\

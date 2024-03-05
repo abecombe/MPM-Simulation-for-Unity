@@ -2,6 +2,7 @@
 
 #include "../Common.hlsl"
 
+float _ParticleMass;
 float3 _ParticleInitRangeMin;
 float3 _ParticleInitRangeMax;
 
@@ -17,8 +18,9 @@ void InitParticle(uint3 thread_id : SV_DispatchThreadID)
     Particle p = (Particle)0;
 
     p.position = PCG3_Range(p_id, _ParticleInitRangeMin, _ParticleInitRangeMax);
+    p.mass = _ParticleMass;
 
-    ClampPosition(p.position, _GridMin, _GridMax);
+    ClampPosition(p.position, _GridMin, _GridMax, _GridSpacing);
 
     _ParticleBufferWrite[p_id] = p;
 }

@@ -607,16 +607,13 @@ MonoBehaviour:
     x: 1
     y: 9
     z: 9
-  _flipness: 0.99
+  _particleMass: 1
   _gravity: {x: 0, y: -9.8, z: 0}
-  _viscosity: 0
+  _eosStiffness: 10
+  _eosPower: 7
+  _dynamicViscosity: 0.1
   _mouseForce: 1.32
   _mouseForceRange: 2.25
-  _advectionMethod: 0
-  _activeDensityProjection: 1
-  _diffusionJacobiIteration: 15
-  _pressureProjectionJacobiIteration: 15
-  _densityProjectionJacobiIteration: 30
   _rosettaUIRoot: {fileID: 1005516105}
   _toggleUIKey: 9
   _showFps: 1

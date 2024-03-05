@@ -1,14 +1,11 @@
-﻿#pragma kernel GridToParticle
+﻿#pragma kernel Advect
 
 #include "../Common.hlsl"
-#include "../APICParamsSampling.hlsl"
 
 RWStructuredBuffer<Particle> _ParticleBufferRW;
 
-StructuredBuffer<float3> _GridVelocityBufferRead;
-
 [numthreads(128, 1, 1)]
-void GridToParticle(uint3 thread_id : SV_DispatchThreadID)
+void Advect(uint3 thread_id : SV_DispatchThreadID)
 {
     RETURN_IF_INVALID(thread_id);
 
@@ -16,7 +13,9 @@ void GridToParticle(uint3 thread_id : SV_DispatchThreadID)
 
     Particle p = _ParticleBufferRW[p_id];
 
-    SampleAPICParams(p, _GridVelocityBufferRead);
+    p.position += p.velocity * _DeltaTime;
+
+    ClampPosition(p.position, _GridMin, _GridMax, _GridSpacing);
 
     _ParticleBufferRW[p_id] = p;
 }

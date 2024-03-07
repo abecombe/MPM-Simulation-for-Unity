@@ -5,7 +5,7 @@ struct Particle
 {
     float3 position;
     float3 velocity;
-    float3x3 C;
+    float3x3 C; // affine momentum matrix
     float mass;
 };
 

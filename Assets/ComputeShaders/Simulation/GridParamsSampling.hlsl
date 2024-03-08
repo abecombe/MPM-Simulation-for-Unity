@@ -50,14 +50,16 @@ return ret;\
 #define S1(S) (0.75f - S * S)
 #define S2(S) (0.5f * (0.5f + S) * (0.5f + S))
 
+#define GET_VALUE_OF_EACH_CELL(SUM, C_INDEX, S, WEIGHT, GRID_BUFFER, STRUCT) {\
+const uint c_id = CellIndexToCellID(C_INDEX);\
+SUM += GRID_BUFFER[c_id] * WEIGHT;\
+}\
+
 #define INTERPOLATE_X(SUM, C_INDEX, S, WEIGHT, GRID_BUFFER, STRUCT) {\
-const uint c_id_0 = CellIndexToCellID(C_INDEX + int3(-1, 0, 0));\
-const uint c_id_1 = CellIndexToCellID(C_INDEX + int3(0, 0, 0));\
-const uint c_id_2 = CellIndexToCellID(C_INDEX + int3(1, 0, 0));\
 STRUCT sum_x = (STRUCT)0;\
-sum_x += GRID_BUFFER[c_id_0] * S0(S.x);\
-sum_x += GRID_BUFFER[c_id_1] * S1(S.x);\
-sum_x += GRID_BUFFER[c_id_2] * S2(S.x);\
+GET_VALUE_OF_EACH_CELL(sum_x, C_INDEX + int3(0, 0, -1), S, S0(S.x), GRID_BUFFER, STRUCT)\
+GET_VALUE_OF_EACH_CELL(sum_x, C_INDEX + int3(0, 0, 0), S, S1(S.x), GRID_BUFFER, STRUCT)\
+GET_VALUE_OF_EACH_CELL(sum_x, C_INDEX + int3(0, 0, 1), S, S2(S.x), GRID_BUFFER, STRUCT)\
 sum_x *= WEIGHT;\
 SUM += sum_x;\
 }\

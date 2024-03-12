@@ -62,11 +62,15 @@ public class MPMSimulation : MonoBehaviour, IDisposable
     private GPUBuffer<uint2> _gridParticleIDBuffer = new();
     private GPUBuffer<float3> _gridVelocityBuffer = new();
     private GPUBuffer<float> _gridMassBuffer = new();
+    private GPUBuffer<float> _gridDivergenceBuffer = new();
+    private GPUDoubleBuffer<float> _gridPressureBuffer = new();
+    private GPUBuffer<uint> _gridTypeBuffer = new();
 
     // Compute Shaders
     private GPUComputeShader _particleInitCs;
     private GPUComputeShader _particleToGridCs;
     private GPUComputeShader _externalForceCs;
+    private GPUComputeShader _pressureProjectionCs;
     private GPUComputeShader _boundaryCs;
     private GPUComputeShader _gridToParticleCs;
     private GPUComputeShader _particleAdvectionCs;
@@ -96,6 +100,7 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         _particleInitCs = new GPUComputeShader("ParticleInitCS");
         _particleToGridCs = new GPUComputeShader("ParticleToGridCS");
         _externalForceCs = new GPUComputeShader("ExternalForceCS");
+        _pressureProjectionCs = new GPUComputeShader("PressureProjectionCS");
         _boundaryCs = new GPUComputeShader("BoundaryCS");
         _gridToParticleCs = new GPUComputeShader("GridToParticleCS");
         _particleAdvectionCs = new GPUComputeShader("ParticleAdvectionCS");
@@ -131,6 +136,9 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         _gridParticleIDBuffer.Init(NumGrids);
         _gridVelocityBuffer.Init(NumGrids);
         _gridMassBuffer.Init(NumGrids);
+        _gridDivergenceBuffer.Init(NumGrids);
+        _gridPressureBuffer.Init(NumGrids);
+        _gridTypeBuffer.Init(NumGrids);
     }
 
     private void InitGPUBuffers()
@@ -164,6 +172,7 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         var k = cs.FindKernel("ParticleToGrid1");
         k.SetBuffer("_ParticleBufferRead", _particleBuffer.Read);
         k.SetBuffer("_GridParticleIDBufferRead", _gridParticleIDBuffer);
+        k.SetBuffer("_GridTypeBufferWrite", _gridTypeBuffer);
         k.SetBuffer("_GridVelocityBufferWrite", _gridVelocityBuffer);
         k.SetBuffer("_GridMassBufferWrite", _gridMassBuffer);
         k.Dispatch(NumGrids);
@@ -221,6 +230,48 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         cs.SetVector("_MouseForceParameter", new float4(mouseAxisVelocity * _mouseForce, _mouseForceRange));
 
         k.Dispatch(NumGrids);
+    }
+
+    // pressure projection term
+    private void DispatchPressureProjection()
+    {
+        var cs = _pressureProjectionCs;
+        var k_div = cs.FindKernel("CalcDivergence");
+        var k_proj = cs.FindKernel("Project");
+        var k_vel = cs.FindKernel("UpdateVelocity");
+
+        SetConstants(cs);
+
+        // calc divergence
+        float3 divergenceParameter = 1f / (2f * GridSpacing);
+        cs.SetVector("_DivergenceParameter", divergenceParameter);
+        k_div.SetBuffer("_GridTypeBufferRead", _gridTypeBuffer);
+        k_div.SetBuffer("_GridVelocityBufferRead", _gridVelocityBuffer);
+        k_div.SetBuffer("_GridDivergenceBufferWrite", _gridDivergenceBuffer);
+
+        k_div.Dispatch(NumGrids);
+
+        // project
+        float3 temp1 = 1f / GridSpacing / GridSpacing;
+        float temp2 = 1f / (2f * (temp1.x + temp1.y + temp1.z));
+        float4 projectionParameter1 = new((float3)temp2 / GridSpacing / GridSpacing, -temp2);
+        cs.SetVector("_PressureProjectionParameter1", projectionParameter1);
+        k_proj.SetBuffer("_GridDivergenceBufferRead", _gridDivergenceBuffer);
+        k_proj.SetBuffer("_GridTypeBufferRead", _gridTypeBuffer);
+        for (uint i = 0; i < 30; i++)
+        {
+            k_proj.SetBuffer("_GridPressureBufferRead", _gridPressureBuffer.Read);
+            k_proj.SetBuffer("_GridPressureBufferWrite", _gridPressureBuffer.Write);
+            k_proj.Dispatch(NumGrids);
+            _gridPressureBuffer.Swap();
+        }
+
+        // update velocity
+        float3 projectionParameter2 = 1f / (2f * GridSpacing);
+        cs.SetVector("_PressureProjectionParameter2", projectionParameter2);
+        k_vel.SetBuffer("_GridVelocityBufferRW", _gridVelocityBuffer);
+        k_vel.SetBuffer("_GridPressureBufferRead", _gridPressureBuffer.Read);
+        k_vel.Dispatch(NumGrids);
     }
 
     // enforcing boundary condition
@@ -285,6 +336,9 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         _gridParticleIDBuffer.Dispose();
         _gridVelocityBuffer.Dispose();
         _gridMassBuffer.Dispose();
+        _gridDivergenceBuffer.Dispose();
+        _gridPressureBuffer.Dispose();
+        _gridTypeBuffer.Dispose();
 
         _gridSortHelper.Dispose();
     }
@@ -358,6 +412,7 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         DispatchParticleToGrid();
         DispatchExternalForce();
         DispatchBoundaryCondition();
+        //DispatchPressureProjection();
         DispatchGridToParticle();
         DispatchAdvection();
         RenderParticles();

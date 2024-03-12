@@ -13,6 +13,8 @@ float _InvRestDensity;
 
 float _DynamicViscosity;
 
+
+RWStructuredBuffer<uint> _GridTypeBufferWrite;
 StructuredBuffer<uint2> _GridParticleIDBufferRead;
 
 StructuredBuffer<Particle> _ParticleBufferRead;
@@ -36,6 +38,11 @@ void ParticleToGrid1(uint3 thread_id : SV_DispatchThreadID)
 
     const uint c_id = thread_id.x;
     const int3 c_index = CellIDToCellIndex(c_id);
+
+    // decide grid type
+    const uint2 particle_index = _GridParticleIDBufferRead[c_id];
+    _GridTypeBufferWrite[c_id] = particle_index.y - particle_index.x > 0 ? 1 : 0;
+
 
     const float3 c_position = CellIndexToWorldPos(c_index);
 

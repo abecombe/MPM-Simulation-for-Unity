@@ -16,7 +16,7 @@ void GridToParticle(uint3 thread_id : SV_DispatchThreadID)
 
     Particle p = _ParticleBufferRW[p_id];
 
-    SampleAPICParams(p, _GridVelocityBufferRead);
+    SAMPLE_APIC_PARAMS_MASTER(p);
 
     _ParticleBufferRW[p_id] = p;
 }

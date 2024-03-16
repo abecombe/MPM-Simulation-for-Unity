@@ -5,8 +5,10 @@ struct Particle
 {
     float3 position;
     float3 velocity;
+    float3x3 F; // deformation gradient
     float3x3 C; // affine momentum matrix
     float mass;
+    float volume0; // initial volume
 };
 
 

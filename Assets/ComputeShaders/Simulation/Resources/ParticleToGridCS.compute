@@ -10,8 +10,10 @@
 float _EosStiffness;
 float _EosPower;
 float _InvRestDensity;
-
 float _DynamicViscosity;
+
+float _ElasticLambda;
+float _ElasticMu;
 
 StructuredBuffer<uint2> _GridParticleIDBufferRead;
 
@@ -65,15 +67,32 @@ void ParticleToGrid2(uint3 thread_id : SV_DispatchThreadID)
 
     const uint p_id = thread_id.x;
 
-    const Particle p = _ParticleBufferRead[p_id];
+    Particle p = _ParticleBufferRead[p_id];
 
-    const float density = SampleGridParam(p.position, _GridMassBufferRead) * _GridInvSpacing * _GridInvSpacing * _GridInvSpacing;
-    const float volume = p.mass / density;
+    float volume = 0;
+    float3x3 stress = 0;
 
-    const float pressure = _EosStiffness * max(pow(max(density * _InvRestDensity, 0), _EosPower) - 1.0f, 0);
-
-    const float3x3 dvdx = p.C;
-    const float3x3 stress = -pressure * Identity3x3 + _DynamicViscosity * (dvdx + transpose(dvdx));
+    switch (p.Type())
+    {
+        case PT_FLUID:
+            const float density = SampleGridParam(p.position, _GridMassBufferRead) * _GridInvSpacing * _GridInvSpacing * _GridInvSpacing;
+            volume = p.mass / density;
+            const float pressure = _EosStiffness * max(pow(max(density * _InvRestDensity, 0), _EosPower) - 1.0f, 0);
+            const float3x3 dvdx = p.C;
+            stress = -pressure * Identity3x3 + _DynamicViscosity * (dvdx + transpose(dvdx));
+            break;
+        case PT_ELASTIC:
+            const float3x3 F = p.F;
+            const float J = determinant(F);
+            volume = mul(p.volume0, J);
+            const float3x3 F_T = transpose(F);
+            const float3x3 F_inv_T = inverse(F_T);
+            const float3x3 P = _ElasticMu * (F - F_inv_T) + _ElasticLambda * log(J) * F_inv_T;
+            stress = mul(P, F_T) / J;
+            break;
+        default:
+            break;
+    }
 
     const float3x3 f = -volume * (4.0f * _GridInvSpacing * _GridInvSpacing) * stress;
 

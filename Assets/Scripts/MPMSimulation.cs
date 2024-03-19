@@ -17,6 +17,7 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         public float3x3 C; // affine momentum matrix
         public float Mass;
         public float Volume0; // initial volume
+        public uint Flags;
     }
 
     private enum Quality
@@ -42,8 +43,8 @@ public class MPMSimulation : MonoBehaviour, IDisposable
     // Particle Params
     [SerializeField] private float3 _particleInitRangeMin;
     [SerializeField] private float3 _particleInitRangeMax;
-    private int3 ParticleInitGridMin => math.clamp((int3)math.round((_particleInitRangeMin - GridMin) * GridInvSpacing - 0.5f), 0, GridSize - 1);
-    private int3 ParticleInitGridMax => math.clamp((int3)math.round((_particleInitRangeMax - GridMin) * GridInvSpacing - 0.5f), ParticleInitGridMin, GridSize - 1);
+    private int3 ParticleInitGridMin => math.clamp((int3)math.round((_particleInitRangeMin - GridMin) * GridInvSpacing - 0.5f), 1, GridSize - 2);
+    private int3 ParticleInitGridMax => math.clamp((int3)math.round((_particleInitRangeMax - GridMin) * GridInvSpacing - 0.5f), ParticleInitGridMin, GridSize - 2);
     private int3 ParticleInitGridSize => ParticleInitGridMax - ParticleInitGridMin + 1;
 
     // Grid Params
@@ -83,6 +84,8 @@ public class MPMSimulation : MonoBehaviour, IDisposable
     [SerializeField] private float _eosStiffness = 10.0f;
     [SerializeField] private float _eosPower = 4.0f;
     [SerializeField] private float _dynamicViscosity = 0.1f;
+    [SerializeField] private float _elasticLambda = 10.0f;
+    [SerializeField] private float _elasticMu = 20.0f;
     [SerializeField] [Range(0f, 5f)] private float _mouseForce = 1.32f;
     [SerializeField] [Range(0f, 5f)] private float _mouseForceRange = 2.25f;
 
@@ -112,13 +115,28 @@ public class MPMSimulation : MonoBehaviour, IDisposable
 
         // init particle
         var cs = _particleInitCs;
-        var k = cs.FindKernel("InitParticle");
+
         SetConstants(cs);
+
+        var k = cs.FindKernel("InitParticle");
         cs.SetFloat("_ParticleMass", _particleMass);
         cs.SetInts("_ParticleInitGridMin", ParticleInitGridMin);
         cs.SetInts("_ParticleInitGridMax", ParticleInitGridMax);
         cs.SetInts("_ParticleInitGridSize", ParticleInitGridSize);
         k.SetBuffer("_ParticleBufferWrite", _particleBuffer.Read);
+        k.Dispatch(NumParticles);
+
+        _gridSortHelper.Sort(_particleBuffer, _gridParticleIDBuffer, GridMin, GridMax, GridSize, GridSpacing);
+
+        k = cs.FindKernel("CalcGridMass");
+        k.SetBuffer("_ParticleBufferRead", _particleBuffer.Read);
+        k.SetBuffer("_GridParticleIDBufferRead", _gridParticleIDBuffer);
+        k.SetBuffer("_GridMassBufferWrite", _gridMassBuffer);
+        k.Dispatch(NumGrids);
+
+        k = cs.FindKernel("CalcParticleVolume0");
+        k.SetBuffer("_ParticleBufferRW", _particleBuffer.Read);
+        k.SetBuffer("_GridMassBufferRead", _gridMassBuffer);
         k.Dispatch(NumParticles);
 
         // init vfx
@@ -138,8 +156,8 @@ public class MPMSimulation : MonoBehaviour, IDisposable
 
     private void InitGPUBuffers()
     {
-        InitParticleBuffers();
         InitGridBuffers();
+        InitParticleBuffers();
     }
     #endregion
 
@@ -176,6 +194,8 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         cs.SetFloat("_EosPower", _eosPower);
         cs.SetFloat("_InvRestDensity", 1f / (NumParticleInACell * _particleMass / math.pow(GridSpacing, 3)));
         cs.SetFloat("_DynamicViscosity", _dynamicViscosity);
+        cs.SetFloat("_ElasticLambda", _elasticLambda);
+        cs.SetFloat("_ElasticMu", _elasticMu);
         k.SetBuffer("_ParticleBufferRead", _particleBuffer.Read);
         k.SetBuffer("_GridMassBufferRead", _gridMassBuffer);
         k.SetBuffer("_ParticleStressForceBufferWrite", _particleStressForceBuffer);
@@ -313,7 +333,9 @@ public class MPMSimulation : MonoBehaviour, IDisposable
                     UI.Field("Gravity", () => _gravity),
                     UI.Field("EOS Stiffness", () => _eosStiffness),
                     UI.Field("EOS Power", () => _eosPower),
-                    UI.Field("Dynamic Viscosity", () => _dynamicViscosity)
+                    UI.Field("Dynamic Viscosity", () => _dynamicViscosity),
+                    UI.Field("Elastic Lambda", () => _elasticLambda),
+                    UI.Field("Elastic Mu", () => _elasticMu)
                 ),
                 UI.Space().SetHeight(10f),
                 UI.Label("Interaction"),

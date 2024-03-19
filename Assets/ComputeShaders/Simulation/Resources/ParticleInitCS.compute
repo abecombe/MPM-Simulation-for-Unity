@@ -1,13 +1,27 @@
 ﻿#pragma kernel InitParticle
+#pragma kernel CalcGridMass
+#pragma kernel CalcParticleVolume0
+
+#define USE_QUADRATIC_KERNEL
 
 #include "../Common.hlsl"
+#include "../GridParamsSampling.hlsl"
 
 float _ParticleMass;
 int3 _ParticleInitGridMin;
 int3 _ParticleInitGridMax;
 int3 _ParticleInitGridSize;
 
+StructuredBuffer<uint2> _GridParticleIDBufferRead;
+
+StructuredBuffer<Particle> _ParticleBufferRead;
 RWStructuredBuffer<Particle> _ParticleBufferWrite;
+RWStructuredBuffer<Particle> _ParticleBufferRW;
+
+StructuredBuffer<float> _GridMassBufferRead;
+RWStructuredBuffer<float> _GridMassBufferWrite;
+
+static const int grid_range[6] = { -1, 1, -1, 1, -1, 1 };
 
 [numthreads(128, 1, 1)]
 void InitParticle(uint3 thread_id : SV_DispatchThreadID)
@@ -22,10 +36,51 @@ void InitParticle(uint3 thread_id : SV_DispatchThreadID)
     const int y = p_id / (_ParticleInitGridSize.x * 2) % (_ParticleInitGridSize.y * 2);
     const int z = p_id / ((_ParticleInitGridSize.x * 2) * (_ParticleInitGridSize.y * 2));
     p.position = GridPosToWorldPos(_ParticleInitGridMin + 0.25f + float3(x, y, z) * 0.5f);
+    ClampPosition(p.position, _GridMin, _GridMax, _GridSpacing);
+
+    p.F = Identity3x3;
 
     p.mass = _ParticleMass;
 
-    ClampPosition(p.position, _GridMin, _GridMax, _GridSpacing);
+    p.SetType(PT_ELASTIC);
 
     _ParticleBufferWrite[p_id] = p;
+}
+
+[numthreads(128, 1, 1)]
+void CalcGridMass(uint3 thread_id : SV_DispatchThreadID)
+{
+    RETURN_IF_INVALID(thread_id);
+
+    const uint c_id = thread_id.x;
+    const int3 c_index = CellIDToCellIndex(c_id);
+
+    const float3 c_position = CellIndexToWorldPos(c_index);
+
+    float sum_mass = 0;
+
+    FOR_EACH_NEIGHBOR_CELL_PARTICLE_START(c_index, p_id, _GridParticleIDBufferRead, grid_range)
+    {
+        const Particle p = _ParticleBufferRead[p_id];
+
+        sum_mass += GetWeight(p.position, c_position, _GridInvSpacing) * p.mass;
+    }
+    FOR_EACH_NEIGHBOR_CELL_PARTICLE_END
+
+    _GridMassBufferWrite[c_id] = sum_mass;
+}
+
+[numthreads(128, 1, 1)]
+void CalcParticleVolume0(uint3 thread_id : SV_DispatchThreadID)
+{
+    RETURN_IF_INVALID(thread_id);
+
+    const uint p_id = thread_id.x;
+
+    Particle p = _ParticleBufferRW[p_id];
+
+    const float density = SampleGridParam(p.position, _GridMassBufferRead) * _GridInvSpacing * _GridInvSpacing * _GridInvSpacing;
+    p.volume0 = p.mass / density;
+
+    _ParticleBufferRW[p_id] = p;
 }

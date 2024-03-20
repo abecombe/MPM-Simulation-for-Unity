@@ -107,6 +107,13 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         _renderingCs = new GPUComputeShader("RenderingCS");
     }
 
+    private void InitGridBuffers()
+    {
+        _gridParticleIDBuffer.Init(NumGrids);
+        _gridVelocityBuffer.Init(NumGrids);
+        _gridMassBuffer.Init(NumGrids);
+    }
+
     private void InitParticleBuffers()
     {
         _particleBuffer.Init(NumParticles);
@@ -147,13 +154,6 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         vfx.SetGraphicsBuffer("ParticleBuffer", _particleRenderingBuffer);
     }
 
-    private void InitGridBuffers()
-    {
-        _gridParticleIDBuffer.Init(NumGrids);
-        _gridVelocityBuffer.Init(NumGrids);
-        _gridMassBuffer.Init(NumGrids);
-    }
-
     private void InitGPUBuffers()
     {
         InitGridBuffers();
@@ -171,6 +171,7 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         cs.SetInts("_GridSize", GridSize);
         cs.SetFloat("_GridSpacing", GridSpacing);
         cs.SetFloat("_GridInvSpacing", GridInvSpacing);
+        cs.SetFloat("_InvD", 4f / (GridSpacing * GridSpacing));
     }
 
     // transferring velocity from particle to grid
@@ -182,14 +183,14 @@ public class MPMSimulation : MonoBehaviour, IDisposable
 
         SetConstants(cs);
 
-        var k = cs.FindKernel("ParticleToGrid1");
+        var k = cs.FindKernel("CalcGridMomentum");
         k.SetBuffer("_ParticleBufferRead", _particleBuffer.Read);
         k.SetBuffer("_GridParticleIDBufferRead", _gridParticleIDBuffer);
         k.SetBuffer("_GridVelocityBufferWrite", _gridVelocityBuffer);
         k.SetBuffer("_GridMassBufferWrite", _gridMassBuffer);
         k.Dispatch(NumGrids);
 
-        k = cs.FindKernel("ParticleToGrid2");
+        k = cs.FindKernel("CalcParticleStressForce");
         cs.SetFloat("_EosStiffness", _eosStiffness);
         cs.SetFloat("_EosPower", _eosPower);
         cs.SetFloat("_InvRestDensity", 1f / (NumParticleInACell * _particleMass / math.pow(GridSpacing, 3)));
@@ -201,7 +202,7 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         k.SetBuffer("_ParticleStressForceBufferWrite", _particleStressForceBuffer);
         k.Dispatch(NumParticles);
 
-        k = cs.FindKernel("ParticleToGrid3");
+        k = cs.FindKernel("CalcGridVelocity");
         k.SetBuffer("_ParticleBufferRead", _particleBuffer.Read);
         k.SetBuffer("_ParticleStressForceBufferRead", _particleStressForceBuffer);
         k.SetBuffer("_GridParticleIDBufferRead", _gridParticleIDBuffer);

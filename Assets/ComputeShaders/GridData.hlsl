@@ -6,6 +6,7 @@ float3 _GridMax;
 int3 _GridSize;
 float _GridSpacing;
 float _GridInvSpacing;
+float _InvD;
 
 
 #endif /* CS_GRID_DATA_HLSL */

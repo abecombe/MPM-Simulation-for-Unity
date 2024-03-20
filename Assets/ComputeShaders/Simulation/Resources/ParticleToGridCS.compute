@@ -1,6 +1,6 @@
-﻿#pragma kernel ParticleToGrid1
-#pragma kernel ParticleToGrid2
-#pragma kernel ParticleToGrid3
+﻿#pragma kernel CalcGridMomentum
+#pragma kernel CalcParticleStressForce
+#pragma kernel CalcGridVelocity
 
 #define USE_QUADRATIC_KERNEL
 
@@ -32,7 +32,7 @@ RWStructuredBuffer<float> _GridMassBufferWrite;
 static const int grid_range[6] = { -1, 1, -1, 1, -1, 1 };
 
 [numthreads(128, 1, 1)]
-void ParticleToGrid1(uint3 thread_id : SV_DispatchThreadID)
+void CalcGridMomentum(uint3 thread_id : SV_DispatchThreadID)
 {
     RETURN_IF_INVALID(thread_id);
 
@@ -61,7 +61,7 @@ void ParticleToGrid1(uint3 thread_id : SV_DispatchThreadID)
 }
 
 [numthreads(128, 1, 1)]
-void ParticleToGrid2(uint3 thread_id : SV_DispatchThreadID)
+void CalcParticleStressForce(uint3 thread_id : SV_DispatchThreadID)
 {
     RETURN_IF_INVALID(thread_id);
 
@@ -69,8 +69,8 @@ void ParticleToGrid2(uint3 thread_id : SV_DispatchThreadID)
 
     Particle p = _ParticleBufferRead[p_id];
 
-    float volume = 0;
-    float3x3 stress = 0;
+    float volume;
+    float3x3 stress;
 
     switch (p.Type())
     {
@@ -91,16 +91,18 @@ void ParticleToGrid2(uint3 thread_id : SV_DispatchThreadID)
             stress = mul(P, F_T) / J;
             break;
         default:
+            volume = p.volume0;
+            stress = 0;
             break;
     }
 
-    const float3x3 f = -volume * (4.0f * _GridInvSpacing * _GridInvSpacing) * stress;
+    const float3x3 f = -volume * _InvD * stress;
 
     _ParticleStressForceBufferWrite[p_id] = f;
 }
 
 [numthreads(128, 1, 1)]
-void ParticleToGrid3(uint3 thread_id : SV_DispatchThreadID)
+void CalcGridVelocity(uint3 thread_id : SV_DispatchThreadID)
 {
     RETURN_IF_INVALID(thread_id);
 

@@ -55,7 +55,7 @@ float3x3 B;\
 B._m00_m01_m02 = b_velocity._m00_m01_m02;\
 B._m10_m11_m12 = b_velocity._m10_m11_m12;\
 B._m20_m21_m22 = b_velocity._m20_m21_m22;\
-PARTICLE.C = B * (4.0f * _GridInvSpacing * _GridInvSpacing);\
+PARTICLE.C = B * _InvD;\
 PARTICLE.velocity = b_velocity._m03_m13_m23;\
 
 inline void SampleAPICParams(inout Particle particle, StructuredBuffer<float3> grid_velocity_buffer)

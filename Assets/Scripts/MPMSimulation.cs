@@ -150,7 +150,7 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         var vfx = FindObjectOfType<VisualEffect>();
         vfx.Reinit();
         vfx.SetFloat("NumInstance", NumParticles);
-        vfx.SetFloat("Size", GridSpacing * 0.8f);
+        vfx.SetFloat("Size", GridSpacing * 0.5f);
         vfx.SetGraphicsBuffer("ParticleBuffer", _particleRenderingBuffer);
     }
 

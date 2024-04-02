@@ -3,9 +3,11 @@
 
 #include "../Bit.hlsl"
 
+// flags
 static const uint ParticleTypeMask      = 0x00000007;
 static const uint ParticleTypeMaskShift = 0;
 
+// types
 static const uint PT_NONE    = 0;
 static const uint PT_FLUID   = 1;
 static const uint PT_ELASTIC = 2;

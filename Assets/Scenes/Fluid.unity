@@ -612,8 +612,8 @@ MonoBehaviour:
   _eosStiffness: 10
   _eosPower: 7
   _dynamicViscosity: 0.1
-  _elasticLambda: 0
-  _elasticMu: 0
+  _elasticLambda: 10000
+  _elasticMu: 0.3
   _mouseForce: 1.32
   _mouseForceRange: 2.25
   _rosettaUIRoot: {fileID: 1005516105}

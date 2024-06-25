@@ -4,8 +4,10 @@
 #include "../Bit.hlsl"
 
 // flags
-static const uint ParticleTypeMask      = 0x00000007;
-static const uint ParticleTypeMaskShift = 0;
+static const uint ParticleIDMask        = 0x00FFFFFF; // Max: 16,777,216 particles
+static const uint ParticleIDMaskShift   = 0;
+static const uint ParticleTypeMask      = 0x0F000000; // Max: 16 types
+static const uint ParticleTypeMaskShift = 24;
 
 // types
 static const uint PT_NONE    = 0;
@@ -20,8 +22,16 @@ struct Particle
     float3x3 C; // affine momentum matrix
     float mass;
     float volume0; // initial volume
-    uint flags;
+    uint flags; // id and type
 
+    uint ID()
+    {
+        return GET_VALUE(flags, ParticleIDMask, ParticleIDMaskShift);
+    }
+    void SetID(uint id)
+    {
+        SET_VALUE(flags, id, ParticleIDMask, ParticleIDMaskShift);
+    }
     uint Type()
     {
         return GET_VALUE(flags, ParticleTypeMask, ParticleTypeMaskShift);

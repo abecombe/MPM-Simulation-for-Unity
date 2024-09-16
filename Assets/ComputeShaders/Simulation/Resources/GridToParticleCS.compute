@@ -1,5 +1,7 @@
 ﻿#pragma kernel GridToParticle
 
+#define USE_QUADRATIC_KERNEL
+
 #include "../Common.hlsl"
 #include "../APICParamsSampling.hlsl"
 
@@ -16,7 +18,30 @@ void GridToParticle(uint3 thread_id : SV_DispatchThreadID)
 
     Particle p = _ParticleBufferRW[p_id];
 
-    SampleAPICParams(p, _GridVelocityBufferRead);
+    p.velocity = 0;
+    p.C = 0;
+
+    const int3 p_index = WorldPosToCellIndex(p.position);
+
+    for (int gx = max(p_index.x - 1, 0); gx <= min(p_index.x + 1, _GridSize.x - 1); ++gx)
+    {
+        for (int gy = max(p_index.y - 1, 0); gy <= min(p_index.y + 1, _GridSize.y - 1); ++gy)
+        {
+            for (int gz = max(p_index.z - 1, 0); gz <= min(p_index.z + 1, _GridSize.z - 1); ++gz)
+            {
+                const int3 c_index = int3(gx, gy, gz);
+                const uint c_id = CellIndexToCellID(c_index);
+                const float3 c_pos = CellIndexToWorldPos(c_index);
+                const float w = GetWeight(p.position, c_pos, _GridInvSpacing);
+                const float3 vel = _GridVelocityBufferRead[c_id];
+
+                p.velocity += w * vel;
+                p.C += _InvD * w * mul((float3x1)vel, (float1x3)(c_pos - p.position));
+            }
+        }
+    }
+
+    //SampleAPICParams(p, _GridVelocityBufferRead);
 
     p.F = mul(Identity3x3 + _DeltaTime * p.C, p.F);
 

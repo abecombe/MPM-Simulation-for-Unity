@@ -48,7 +48,7 @@ INTERPOLATE_Z(B_VELOCITY, P_POS, C_INDEX, S, GRID_VELOCITY_BUFFER)\
 float3x4 b_velocity = 0;\
 const float3 p_pos = PARTICLE.position;\
 const float3 g_pos = WorldPosToGridPos(p_pos);\
-const int3 c_index = round(g_pos - 0.5f);\
+const int3 c_index = floor(g_pos);\
 const float3 s = (g_pos - 0.5f) - round(g_pos - 0.5f);\
 INTERPOLATE(b_velocity, p_pos, c_index, s, GRID_VELOCITY_BUFFER)\
 float3x3 B;\

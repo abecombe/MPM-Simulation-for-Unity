@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Abecombe.FPSUtil;
 using Abecombe.GPUUtil;
 using RosettaUI;
@@ -30,7 +31,7 @@ public class MPMSimulation : MonoBehaviour, IDisposable
     #endregion
 
     #region Properties
-    private const float DeltaTime = 1f / 60f;
+    private const float DeltaTime = 0.004f;
 
     private const int NumParticleInACell = 8;
     private int NumParticles => ParticleInitGridSize.x * ParticleInitGridSize.y * ParticleInitGridSize.z * NumParticleInACell;
@@ -146,6 +147,10 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         k.SetBuffer("_GridMassBufferRead", _gridMassBuffer);
         k.Dispatch(NumParticles);
 
+        // Particle[] gridMassArray = new Particle[NumParticles];
+        // _particleBuffer.Read.GetData(gridMassArray);
+        // Debug.Log(gridMassArray.Select(x3 => x3.Volume0).Min());
+
         // init vfx
         var vfx = FindObjectOfType<VisualEffect>();
         vfx.Reinit();
@@ -200,6 +205,7 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         k.SetBuffer("_ParticleBufferRead", _particleBuffer.Read);
         k.SetBuffer("_GridMassBufferRead", _gridMassBuffer);
         k.SetBuffer("_ParticleStressForceBufferWrite", _particleStressForceBuffer);
+        k.SetBuffer("_DebugBuffer", _debugBuffer);
         k.Dispatch(NumParticles);
 
         k = cs.FindKernel("CalcGridVelocity");
@@ -379,9 +385,20 @@ public class MPMSimulation : MonoBehaviour, IDisposable
         InitRosettaUI();
     }
 
+    // DataBuffer for Debugging
+    private GPUBuffer<float> _debugBuffer = new();
     private void Update()
     {
+        _debugBuffer.CheckSizeChanged(NumParticles);
         DispatchParticleToGrid();
+        // if (Time.frameCount < 60)
+        // {
+        //     Particle[] particleArray = new Particle[NumParticles];
+        //     _particleBuffer.Read.GetData(particleArray);
+        //     float[] debugArray = new float[NumParticles];
+        //     _debugBuffer.GetData(debugArray);
+        //     Debug.Log("C: " + particleArray.Select(d => d.C.c0.x).Max() + ", J: " + debugArray.Select(d => d).Max());
+        // }
         DispatchExternalForce();
         DispatchBoundaryCondition();
         DispatchGridToParticle();

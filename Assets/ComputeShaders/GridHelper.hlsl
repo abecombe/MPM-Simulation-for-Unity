@@ -37,6 +37,11 @@ inline float3 CellIndexToWorldPos(int3 index)
     return _GridMin + (index + 0.5f) * _GridSpacing;
 }
 
+inline float3 CellIDToWorldPos(uint id)
+{
+    return CellIndexToWorldPos(CellIDToCellIndex(id));
+}
+
 inline float3 GridPosToWorldPos(float3 position)
 {
     return _GridMin + position * _GridSpacing;

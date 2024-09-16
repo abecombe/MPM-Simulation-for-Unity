@@ -41,6 +41,7 @@ void InitParticle(uint3 thread_id : SV_DispatchThreadID)
     ClampPosition(p.position, _GridMin, _GridMax, _GridSpacing);
 
     p.F = Identity3x3;
+    p.C = 0;
 
     p.mass = _ParticleMass;
 
